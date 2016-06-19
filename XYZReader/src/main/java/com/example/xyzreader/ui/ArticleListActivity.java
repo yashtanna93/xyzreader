@@ -7,10 +7,12 @@ import android.content.Intent;
 import android.content.IntentFilter;
 import android.content.Loader;
 import android.database.Cursor;
+import android.graphics.Bitmap;
 import android.os.Bundle;
 import android.support.v4.view.ViewCompat;
 import android.support.v4.widget.SwipeRefreshLayout;
 import android.support.v7.app.AppCompatActivity;
+import android.support.v7.graphics.Palette;
 import android.support.v7.widget.RecyclerView;
 import android.support.v7.widget.StaggeredGridLayoutManager;
 import android.support.v7.widget.Toolbar;
@@ -19,6 +21,8 @@ import android.view.View;
 import android.view.ViewGroup;
 import android.widget.TextView;
 
+import com.android.volley.VolleyError;
+import com.android.volley.toolbox.ImageLoader;
 import com.example.xyzreader.R;
 import com.example.xyzreader.data.ArticleLoader;
 import com.example.xyzreader.data.ItemsContract;
@@ -33,7 +37,6 @@ import com.example.xyzreader.data.UpdaterService;
 public class ArticleListActivity extends AppCompatActivity implements
         LoaderManager.LoaderCallbacks<Cursor>, SwipeRefreshLayout.OnRefreshListener {
 
-    private Toolbar mToolbar;
     private SwipeRefreshLayout mSwipeRefreshLayout;
     private RecyclerView mRecyclerView;
     private boolean mIsRefreshing = false;
@@ -52,7 +55,7 @@ public class ArticleListActivity extends AppCompatActivity implements
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_article_list);
 
-        mToolbar = (Toolbar) findViewById(R.id.toolbar);
+        Toolbar mToolbar = (Toolbar) findViewById(R.id.toolbar);
         ViewCompat.setElevation(mToolbar, getResources().getDimension(R.dimen.toolbar_elevation));
         setSupportActionBar(mToolbar);
 
@@ -60,7 +63,9 @@ public class ArticleListActivity extends AppCompatActivity implements
 
         mSwipeRefreshLayout = (SwipeRefreshLayout) findViewById(R.id.swipe_refresh_layout);
 
-        mSwipeRefreshLayout.setOnRefreshListener(this);
+        if (mSwipeRefreshLayout != null) {
+            mSwipeRefreshLayout.setOnRefreshListener(this);
+        }
 
         mRecyclerView = (RecyclerView) findViewById(R.id.recycler_view);
         getLoaderManager().initLoader(0, null, this);
@@ -132,6 +137,7 @@ public class ArticleListActivity extends AppCompatActivity implements
 
     private class Adapter extends RecyclerView.Adapter<ViewHolder> {
         private Cursor mCursor;
+        private Bitmap bitmap;
 
         public Adapter(Cursor cursor) {
             mCursor = cursor;
@@ -158,7 +164,7 @@ public class ArticleListActivity extends AppCompatActivity implements
         }
 
         @Override
-        public void onBindViewHolder(ViewHolder holder, int position) {
+        public void onBindViewHolder(final ViewHolder holder, int position) {
             mCursor.moveToPosition(position);
             holder.titleView.setText(mCursor.getString(ArticleLoader.Query.TITLE));
             holder.subtitleView.setText(
@@ -168,10 +174,55 @@ public class ArticleListActivity extends AppCompatActivity implements
                             DateUtils.FORMAT_ABBREV_ALL).toString()
                             + " by "
                             + mCursor.getString(ArticleLoader.Query.AUTHOR));
-            holder.thumbnailView.setImageUrl(
-                    mCursor.getString(ArticleLoader.Query.THUMB_URL),
-                    ImageLoaderHelper.getInstance(ArticleListActivity.this).getImageLoader());
+            ImageLoaderHelper.getInstance(ArticleListActivity.this).getImageLoader()
+                    .get(mCursor.getString(ArticleLoader.Query.THUMB_URL),
+                            new ImageLoader.ImageListener() {
+
+                                @Override
+                                public void onErrorResponse(VolleyError volleyError) {
+
+                                }
+
+                                @Override
+                                public void onResponse(ImageLoader.ImageContainer imageContainer, boolean b) {
+                                    if (imageContainer.getBitmap() != null) {
+                                        holder.thumbnailView.setLocalImageBitmap(imageContainer.getBitmap());
+                                        Palette palette = Palette.from(imageContainer.getBitmap()).generate();
+                                        if(palette.getVibrantSwatch()!=null) {
+                                            holder.titleView.setBackgroundColor(palette.getVibrantSwatch().getRgb());
+                                            holder.subtitleView.setBackgroundColor(palette.getVibrantSwatch().getRgb());
+                                            holder.titleView.setTextColor(palette.getVibrantSwatch().getTitleTextColor());
+                                            holder.subtitleView.setTextColor(palette.getVibrantSwatch().getBodyTextColor());
+                                        } else {
+                                            holder.titleView.setBackgroundColor(palette.getMutedSwatch().getRgb());
+                                            holder.subtitleView.setBackgroundColor(palette.getMutedSwatch().getRgb());
+                                            holder.titleView.setTextColor(palette.getMutedSwatch().getTitleTextColor());
+                                            holder.subtitleView.setTextColor(palette.getMutedSwatch().getBodyTextColor());
+                                        }
+                                    }
+                                }
+                            });
             holder.thumbnailView.setAspectRatio(mCursor.getFloat(ArticleLoader.Query.ASPECT_RATIO));
+//            holder.thumbnailView.setImageUrl(
+//                    mCursor.getString(ArticleLoader.Query.THUMB_URL),
+//                    ImageLoaderHelper.getInstance(ArticleListActivity.this).getImageLoader());
+//            Log.v("Image URL", mCursor.getString(ArticleLoader.Query.THUMB_URL));
+//            try {
+//                String imageUri = mCursor.getString(ArticleLoader.Query.THUMB_URL);
+//                Log.v("Image URI", imageUri);
+//                bitmap = BitmapFactory.decodeStream(imageStream);
+//                Palette.from(bitmap).generate(new Palette.PaletteAsyncListener() {
+//                    @Override
+//                    public void onGenerated(Palette palette) {
+//                        holder.titleView.setBackgroundColor(palette.getVibrantSwatch().getRgb());
+//                        holder.subtitleView.setBackgroundColor(palette.getVibrantSwatch().getRgb());
+//                        holder.titleView.setTextColor(palette.getVibrantSwatch().getTitleTextColor());
+//                        holder.subtitleView.setTextColor(palette.getVibrantSwatch().getBodyTextColor());
+//                    }
+//                });
+//            } catch (FileNotFoundException e) {
+//                e.printStackTrace();
+//            }
         }
 
         @Override
