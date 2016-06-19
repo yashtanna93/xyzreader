@@ -16,7 +16,7 @@
 -->
 
 <resources>
-    <color name="photo_placeholder">#ccc</color>
+    <color name="photo_placeholder">#FF5722</color>
 
     <color name="theme_primary">#FF5722</color>
     <color name="theme_primary_dark">#E64A19</color>
